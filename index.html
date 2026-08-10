@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OpenRouter Chat</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1f232c;
+    --border: #2a2f3a;
+    --text: #e6e8ec;
+    --muted: #8b93a3;
+    --accent: #4f8cff;
+    --accent-hover: #6a9dff;
+    --ok: #3fb950;
+    --err: #f85149;
+    --warn: #d29922;
+    --user-bubble: #2a3142;
+    --asst-bubble: #1f232c;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-size: 15px;
+    margin: 0;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .hdr-field { display: flex; flex-direction: column; gap: 3px; }
+  .hdr-field label {
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  input, select, textarea {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 9px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  #apikey { width: 200px; font-family: var(--mono); font-size: 12px; }
+  #modelSelectA, #modelSelectB { width: 240px; font-family: var(--mono); font-size: 12px; }
+  #loadModelsBtn, #clearBtn, #settingsBtn {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  #loadModelsBtn:hover, #clearBtn:hover, #settingsBtn:hover { border-color: var(--accent); color: var(--accent); }
+  #loadModelsBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .spacer { flex: 1; }
+  .status-pill {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 3px 9px;
+    white-space: nowrap;
+  }
+  .status-pill.ok { color: var(--ok); border-color: var(--ok); }
+  .status-pill.err { color: var(--err); border-color: var(--err); }
+
+  /* Settings panel */
+  #settingsPanel {
+    display: none;
+    padding: 10px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  #settingsPanel.open { display: flex; }
+  .setting { display: flex; flex-direction: column; gap: 3px; min-width: 140px; }
+  .setting label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+  }
+  .setting input[type="range"] { width: 140px; }
+  .setting .val { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  #systemPrompt {
+    flex: 1;
+    min-width: 280px;
+    min-height: 32px;
+    resize: vertical;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .toggle-row { display: flex; align-items: center; gap: 8px; }
+  .switch {
+    position: relative;
+    width: 34px;
+    height: 18px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 12px; height: 12px;
+    background: var(--muted);
+    border-radius: 50%;
+    transition: transform 0.15s, background 0.15s;
+  }
+  .switch.on { background: rgba(79,140,255,0.25); border-color: var(--accent); }
+  .switch.on::after { transform: translateX(15px); background: var(--accent); }
+
+  /* Chat area */
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  #chat .inner { max-width: 1200px; width: 100%; margin: 0 auto; padding: 0 16px; display: flex; flex-direction: column; gap: 16px; }
+  .msg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 100%;
+  }
+  .turn { display: flex; flex-direction: column; gap: 8px; }
+  .turn .user-msg { max-width: 760px; align-self: center; width: 100%; }
+  .compare-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .col-header {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+  }
+  .col-header .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .col-header .dot.a { background: #4f8cff; }
+  .col-header .dot.b { background: #d2a8ff; }
+  .col-header .model-id { color: var(--text); }
+  .msg .role {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .msg .bubble {
+    padding: 10px 14px;
+    border-radius: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.55;
+  }
+  .msg.user .bubble { background: var(--user-bubble); border: 1px solid var(--border); }
+  .msg.assistant .bubble { background: var(--asst-bubble); border: 1px solid var(--border); }
+  .msg.assistant .bubble { white-space: normal; }
+  .msg .bubble.error { color: var(--err); border-color: var(--err); background: rgba(248,81,73,0.08); }
+  .copy-btn {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 10px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .msg:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .usage-row {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-top: 4px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .usage-row .tag {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1px 6px;
+  }
+
+  /* Markdown */
+  .bubble p { margin: 0 0 8px; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .bubble ul, .bubble ol { margin: 6px 0 8px; padding-left: 22px; }
+  .bubble li { margin-bottom: 3px; }
+  .bubble h1, .bubble h2, .bubble h3 { margin: 10px 0 6px; line-height: 1.3; }
+  .bubble h1 { font-size: 1.3em; } .bubble h2 { font-size: 1.15em; } .bubble h3 { font-size: 1em; }
+  .bubble code { font-family: var(--mono); font-size: 0.88em; background: #000; padding: 1px 5px; border-radius: 4px; }
+  .bubble pre { background: #000; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; overflow: auto; margin: 8px 0; }
+  .bubble pre code { background: none; padding: 0; font-size: 12px; line-height: 1.45; }
+  .bubble a { color: var(--accent); }
+  .bubble blockquote { border-left: 3px solid var(--border); margin: 8px 0; padding: 2px 12px; color: var(--muted); }
+  .bubble table { border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+  .bubble th, .bubble td { border: 1px solid var(--border); padding: 5px 9px; }
+  .bubble th { background: var(--panel-2); }
+  .cursor { display: inline-block; width: 7px; height: 14px; background: var(--accent); margin-left: 2px; vertical-align: text-bottom; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Debug panel */
+  #debugWrap {
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    max-height: 35vh;
+    display: flex;
+    flex-direction: column;
+  }
+  #debugWrap.collapsed { max-height: 36px; }
+  #debugHeader {
+    padding: 7px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    user-select: none;
+  }
+  #debugHeader h3 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  #debugHeader .chev { margin-left: auto; color: var(--muted); font-size: 12px; }
+  #debugBody {
+    flex: 1;
+    overflow: auto;
+    padding: 10px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    white-space: pre;
+    color: #d8dee9;
+    background: #000;
+  }
+  #debugWrap.collapsed #debugBody { display: none; }
+
+  /* Composer */
+  #composer {
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    padding: 12px 16px;
+  }
+  #composer .inner { max-width: 1200px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-end; }
+  #prompt {
+    flex: 1;
+    resize: none;
+    min-height: 44px;
+    max-height: 180px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  #sendBtn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  #sendBtn:hover { background: var(--accent-hover); }
+  #sendBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+  #stopBtn {
+    background: var(--panel-2);
+    color: var(--err);
+    border: 1px solid var(--err);
+    border-radius: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    display: none;
+  }
+  .hint { font-size: 10px; color: var(--muted); margin-top: 4px; text-align: center; }
+  .empty-state {
+    text-align: center;
+    color: var(--muted);
+    padding: 60px 20px;
+    font-style: italic;
+  }
+
+  /* Attachments */
+  #attachBtn {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    flex: 0 0 auto;
+  }
+  #attachBtn:hover { border-color: var(--accent); color: var(--accent); }
+  #fileInput { display: none; }
+  #attachStrip {
+    max-width: 1200px;
+    margin: 0 auto 8px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  #attachStrip:empty { display: none; }
+  .att-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px 8px 4px 4px;
+    font-size: 12px;
+  }
+  .att-chip img { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; }
+  .att-chip .att-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: var(--bg); border-radius: 4px; font-size: 14px; }
+  .att-chip .att-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .att-chip .att-remove { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 0 2px; line-height: 1; }
+  .att-chip .att-remove:hover { color: var(--err); }
+  .att-chip.loading { opacity: 0.6; }
+  .att-chip .att-loading { font-size: 10px; color: var(--warn); }
+  #composer.dragover { outline: 2px dashed var(--accent); outline-offset: -4px; border-radius: 8px; }
+  .user-attachments { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .user-attachments img { max-width: 200px; max-height: 200px; border-radius: 6px; border: 1px solid var(--border); }
+  .user-attachments .doc-ref {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 10px; font-size: 12px; color: var(--muted);
+  }
+  .user-attachments .doc-ref .doc-icon { font-size: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>OpenRouter Chat</h1>
+  <div class="hdr-field">
+    <label for="apikey">API Key</label>
+    <input id="apikey" type="password" placeholder="sk-or-v1-..." spellcheck="false" autocomplete="off" />
+  </div>
+  <div class="hdr-field">
+    <label for="modelSelectA">Model A</label>
+    <input id="modelSelectA" list="modelList" placeholder="openai/gpt-4o-mini" spellcheck="false" autocomplete="off" />
+  </div>
+  <div class="hdr-field">
+    <label for="modelSelectB">Model B</label>
+    <input id="modelSelectB" list="modelList" placeholder="anthropic/claude-3.5-sonnet" spellcheck="false" autocomplete="off" />
+  </div>
+  <datalist id="modelList"></datalist>
+  <button id="loadModelsBtn">Load Models</button>
+  <button id="settingsBtn">Settings</button>
+  <button id="clearBtn">Clear Chat</button>
+  <div class="spacer"></div>
+  <span class="status-pill" id="status">Ready</span>
+</header>
+
+<div id="settingsPanel">
+  <div class="setting">
+    <label>Temperature <span class="val" id="tempVal">0.7</span></label>
+    <input type="range" id="temperature" min="0" max="2" step="0.05" value="0.7" />
+  </div>
+  <div class="setting">
+    <label>Top-p <span class="val" id="toppVal">1.0</span></label>
+    <input type="range" id="topP" min="0" max="1" step="0.05" value="1" />
+  </div>
+  <div class="setting">
+    <label>Max tokens <span class="val" id="maxtokVal">—</span></label>
+    <input type="number" id="maxTokens" min="1" placeholder="auto" style="width:90px" />
+  </div>
+  <div class="toggle-row">
+    <div class="switch on" id="streamSwitch" role="switch" aria-checked="true" tabindex="0"></div>
+    <span style="font-size:12px">Stream</span>
+  </div>
+  <div class="setting" style="flex:1;min-width:280px">
+    <label for="systemPrompt">System prompt</label>
+    <textarea id="systemPrompt" placeholder="You are a helpful assistant." spellcheck="false"></textarea>
+  </div>
+</div>
+
+<div id="chat"><div class="inner" id="chatInner"><div class="empty-state">Enter your API key, load a model, and start chatting.</div></div></div>
+
+<div id="debugWrap" class="collapsed">
+  <div id="debugHeader"><h3>Raw JSON</h3><span class="chev" id="debugChev">▾</span></div>
+  <div id="debugBody">No requests yet.</div>
+</div>
+
+<div id="attachStrip"></div>
+<div id="composer">
+  <div class="inner">
+    <button id="attachBtn" title="Attach files">+</button>
+    <input id="fileInput" type="file" multiple accept="image/*,.txt,.md,.json,.csv,.xml,.yaml,.yml,.py,.js,.ts,.jsx,.tsx,.html,.css,.java,.c,.cpp,.go,.rs,.rb,.php,.swift,.kt,.scala,.sh,.sql,.pdf" />
+    <textarea id="prompt" placeholder="Type a message… (Enter to send, Shift+Enter for newline)" rows="1"></textarea>
+    <button id="sendBtn">Send</button>
+    <button id="stopBtn">Stop</button>
+  </div>
+  <div class="hint">Enter to send · Shift+Enter for newline · drag files to attach</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const apikeyInput = $("apikey");
+  const modelSelectA = $("modelSelectA");
+  const modelSelectB = $("modelSelectB");
+  const modelList = $("modelList");
+  const loadModelsBtn = $("loadModelsBtn");
+  const settingsBtn = $("settingsBtn");
+  const clearBtn = $("clearBtn");
+  const settingsPanel = $("settingsPanel");
+  const temperature = $("temperature");
+  const tempVal = $("tempVal");
+  const topP = $("topP");
+  const toppVal = $("toppVal");
+  const maxTokens = $("maxTokens");
+  const maxtokVal = $("maxtokVal");
+  const streamSwitch = $("streamSwitch");
+  const systemPrompt = $("systemPrompt");
+  const statusEl = $("status");
+  const chatInner = $("chatInner");
+  const promptEl = $("prompt");
+  const sendBtn = $("sendBtn");
+  const stopBtn = $("stopBtn");
+  const debugWrap = $("debugWrap");
+  const debugHeader = $("debugHeader");
+  const debugBody = $("debugBody");
+  const debugChev = $("debugChev");
+
+  const OPENROUTER_CHAT = "https://openrouter.ai/api/v1/chat/completions";
+  const OPENROUTER_MODELS = "https://openrouter.ai/api/v1/models";
+  const REFERER = "https://opencode.ai";
+  const X_TITLE = "OpenRouter Chat";
+
+  let conversations = { A: [], B: [] };
+  let abortControllers = { A: null, B: null };
+  let streaming = true;
+  let modelPrices = {};
+  let activeCount = 0;
+
+  // --- Attachments ---
+  const attachBtn = $("attachBtn");
+  const fileInput = $("fileInput");
+  const attachStrip = $("attachStrip");
+  const composer = $("composer");
+  let pendingAttachments = [];
+  let pdfjsLoaded = false;
+  let pdfjsLoading = null;
+  const TEXT_EXTS = [".txt", ".md", ".json", ".csv", ".xml", ".yaml", ".yml", ".py", ".js", ".ts", ".jsx", ".tsx", ".html", ".css", ".java", ".c", ".cpp", ".go", ".rs", ".rb", ".php", ".swift", ".kt", ".scala", ".sh", ".sql", ".log", ".toml", ".ini", ".env"];
+
+  function loadPdfjs() {
+    if (pdfjsLoaded) return Promise.resolve();
+    if (pdfjsLoading) return pdfjsLoading;
+    pdfjsLoading = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
+      s.onload = () => {
+        try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js"; pdfjsLoaded = true; resolve(); }
+        catch (e) { reject(e); }
+      };
+      s.onerror = () => reject(new Error("Failed to load pdf.js"));
+      document.head.appendChild(s);
+    });
+    return pdfjsLoading;
+  }
+
+  function fileKind(file) {
+    const n = file.name.toLowerCase();
+    if (file.type.startsWith("image/")) return "image";
+    if (n.endsWith(".pdf")) return "pdf";
+    if (TEXT_EXTS.some((e) => n.endsWith(e))) return "text";
+    if (file.type.startsWith("text/")) return "text";
+    return "unsupported";
+  }
+
+  function readImage(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve({ dataUrl: r.result });
+      r.onerror = () => reject(new Error("Failed to read image"));
+      r.readAsDataURL(file);
+    });
+  }
+
+  function readText(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve({ text: r.result });
+      r.onerror = () => reject(new Error("Failed to read text file"));
+      r.readAsText(file);
+    });
+  }
+
+  async function readPdf(file) {
+    await loadPdfjs();
+    const buf = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    let text = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map((it) => it.str).join(" ") + "\n\n";
+    }
+    return { text: text.trim() };
+  }
+
+  async function processFile(file) {
+    const kind = fileKind(file);
+    const att = { id: "a" + Date.now() + Math.random().toString(36).slice(2, 6), name: file.name, mime: file.type, kind, status: "loading" };
+    pendingAttachments.push(att);
+    renderAttachments();
+    try {
+      if (kind === "image") {
+        const { dataUrl } = await readImage(file);
+        att.dataUrl = dataUrl;
+      } else if (kind === "text") {
+        const { text } = await readText(file);
+        att.text = text;
+      } else if (kind === "pdf") {
+        const { text } = await readPdf(file);
+        att.text = text;
+      } else {
+        att.error = "Unsupported file type";
+      }
+      att.status = "ready";
+    } catch (e) {
+      att.error = e.message;
+      att.status = "error";
+    }
+    renderAttachments();
+  }
+
+  function renderAttachments() {
+    attachStrip.innerHTML = "";
+    pendingAttachments.forEach((att) => {
+      const chip = document.createElement("div");
+      chip.className = "att-chip" + (att.status === "loading" ? " loading" : "");
+      if (att.kind === "image" && att.dataUrl) {
+        const img = document.createElement("img");
+        img.src = att.dataUrl;
+        chip.appendChild(img);
+      } else {
+        const icon = document.createElement("span");
+        icon.className = "att-icon";
+        icon.textContent = att.kind === "pdf" ? "PDF" : att.kind === "image" ? "IMG" : "TXT";
+        chip.appendChild(icon);
+      }
+      const name = document.createElement("span");
+      name.className = "att-name";
+      name.textContent = att.name;
+      chip.appendChild(name);
+      if (att.status === "loading") {
+        const l = document.createElement("span");
+        l.className = "att-loading";
+        l.textContent = "reading…";
+        chip.appendChild(l);
+      } else if (att.error) {
+        const l = document.createElement("span");
+        l.className = "att-loading";
+        l.style.color = "var(--err)";
+        l.textContent = att.error;
+        chip.appendChild(l);
+      }
+      const rm = document.createElement("button");
+      rm.className = "att-remove";
+      rm.textContent = "\u00d7";
+      rm.title = "Remove";
+      rm.addEventListener("click", () => {
+        pendingAttachments = pendingAttachments.filter((a) => a.id !== att.id);
+        renderAttachments();
+      });
+      chip.appendChild(rm);
+      attachStrip.appendChild(chip);
+    });
+  }
+
+  attachBtn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => {
+    Array.from(fileInput.files).forEach(processFile);
+    fileInput.value = "";
+  });
+  ["dragenter", "dragover"].forEach((ev) => composer.addEventListener(ev, (e) => { e.preventDefault(); composer.classList.add("dragover"); }));
+  ["dragleave", "drop"].forEach((ev) => composer.addEventListener(ev, (e) => { e.preventDefault(); if (ev === "dragleave" && composer.contains(e.relatedTarget)) return; composer.classList.remove("dragover"); }));
+  composer.addEventListener("drop", (e) => {
+    const files = Array.from(e.dataTransfer.files);
+    files.forEach(processFile);
+  });
+  promptEl.addEventListener("paste", (e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    Array.from(items).forEach((it) => {
+      if (it.kind === "file") { const f = it.getAsFile(); if (f) processFile(f); }
+    });
+  });
+
+  // Build user content: string if no attachments, else multipart array
+  function buildUserContent(text) {
+    const ready = pendingAttachments.filter((a) => a.status === "ready" && !a.error);
+    if (ready.length === 0) return text;
+    const parts = [];
+    if (text.trim()) parts.push({ type: "text", text: text });
+    ready.forEach((att) => {
+      if (att.kind === "image" && att.dataUrl) {
+        parts.push({ type: "image_url", image_url: { url: att.dataUrl } });
+      } else if (att.text != null) {
+        parts.push({ type: "text", text: "=== Document: " + att.name + " ===\n" + att.text });
+      }
+    });
+    return parts;
+  }
+
+  function renderUserBubble(bubble, text, attachments) {
+    bubble.textContent = "";
+    if (text) { const p = document.createElement("div"); p.textContent = text; bubble.appendChild(p); }
+    if (attachments && attachments.length) {
+      const wrap = document.createElement("div");
+      wrap.className = "user-attachments";
+      attachments.forEach((att) => {
+        if (att.kind === "image" && att.dataUrl) {
+          const img = document.createElement("img");
+          img.src = att.dataUrl;
+          wrap.appendChild(img);
+        } else {
+          const ref = document.createElement("div");
+          ref.className = "doc-ref";
+          const icon = document.createElement("span");
+          icon.className = "doc-icon";
+          icon.textContent = att.kind === "pdf" ? "PDF" : "TXT";
+          const name = document.createElement("span");
+          name.textContent = att.name;
+          ref.appendChild(icon);
+          ref.appendChild(name);
+          wrap.appendChild(ref);
+        }
+      });
+      bubble.appendChild(wrap);
+    }
+  }
+
+  function setStatus(msg, kind) {
+    statusEl.textContent = msg;
+    statusEl.className = "status-pill" + (kind ? " " + kind : "");
+  }
+
+  // --- Settings panel ---
+  settingsBtn.addEventListener("click", () => settingsPanel.classList.toggle("open"));
+  temperature.addEventListener("input", () => tempVal.textContent = parseFloat(temperature.value).toFixed(2));
+  topP.addEventListener("input", () => toppVal.textContent = parseFloat(topP.value).toFixed(2));
+  maxTokens.addEventListener("input", () => maxtokVal.textContent = maxTokens.value || "auto");
+  streamSwitch.addEventListener("click", () => {
+    const on = streamSwitch.classList.toggle("on");
+    streamSwitch.setAttribute("aria-checked", on ? "true" : "false");
+    streaming = on;
+  });
+  streamSwitch.addEventListener("keydown", (e) => {
+    if (e.key === " " || e.key === "Enter") { e.preventDefault(); streamSwitch.click(); }
+  });
+
+  // --- Clear ---
+  clearBtn.addEventListener("click", () => {
+    conversations = { A: [], B: [] };
+    chatInner.innerHTML = '<div class="empty-state">Enter your API key, load a model, and start chatting.</div>';
+    debugBody.textContent = "No requests yet.";
+    setStatus("Chat cleared", "ok");
+  });
+
+  // --- Debug panel toggle ---
+  debugHeader.addEventListener("click", () => {
+    debugWrap.classList.toggle("collapsed");
+    debugChev.textContent = debugWrap.classList.contains("collapsed") ? "▾" : "▴";
+  });
+
+  // --- Load models ---
+  loadModelsBtn.addEventListener("click", async () => {
+    loadModelsBtn.disabled = true;
+    setStatus("Fetching models…", "");
+    try {
+      const res = await fetch(OPENROUTER_MODELS, { method: "GET" });
+      if (!res.ok) { setStatus("Failed (HTTP " + res.status + ")", "err"); return; }
+      const json = await res.json();
+      const data = json.data || [];
+      modelList.innerHTML = "";
+      modelPrices = {};
+      data.forEach((m) => {
+        const id = m.id;
+        if (!id) return;
+        const opt = document.createElement("option");
+        opt.value = id;
+        const parts = [];
+        if (m.context_length) parts.push("ctx " + m.context_length);
+        const pp = m.pricing && m.pricing.prompt ? parseFloat(m.pricing.prompt) : null;
+        if (pp != null) parts.push(pp === 0 ? "free" : "$" + pp + "/tok");
+        opt.label = parts.join(" · ");
+        modelList.appendChild(opt);
+        modelPrices[id] = m.pricing || {};
+      });
+      if (!modelSelectA.value && data.length) modelSelectA.value = "openai/gpt-4o-mini";
+      if (!modelSelectB.value && data.length) modelSelectB.value = "anthropic/claude-3.5-sonnet";
+      setStatus("Loaded " + data.length + " models", "ok");
+    } catch (e) {
+      setStatus("Error: " + e.message, "err");
+    } finally {
+      loadModelsBtn.disabled = false;
+    }
+  });
+
+  // --- Minimal markdown renderer ---
+  function escapeHtml(s) {
+    const e = "&";
+    const map = {};
+    map["&"] = e + "amp;";
+    map["<"] = e + "lt;";
+    map[">"] = e + "gt;";
+    map['"'] = e + "quot;";
+    map["'"] = e + "#39;";
+    return String(s).replace(/[&<>"']/g, (c) => map[c]);
+  }
+  function renderMarkdown(text) {
+    // Extract fenced code blocks first
+    const blocks = [];
+    let working = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+      const i = blocks.length;
+      blocks.push('<pre><code class="lang-' + escapeHtml(lang) + '">' + escapeHtml(code.replace(/\n$/, "")) + "</code></pre>");
+      return "\u0000CODE" + i + "\u0000";
+    });
+    // Inline code
+    working = working.replace(/`([^`\n]+)`/g, "<code>" + escapeHtml("$1") + "</code>");
+    // Escape remaining HTML
+    working = escapeHtml(working).replace(/<code>/g, "<code>").replace(/<\/code>/g, "</code>");
+    // Restore code blocks placeholders (already escaped internally)
+    working = working.replace(/\u0000CODE(\d+)\u0000/g, (_, i) => blocks[parseInt(i, 10)]);
+    // Headings
+    working = working.replace(/^### (.+)$/gm, "<h3>$1</h3>")
+      .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+      .replace(/^# (.+)$/gm, "<h1>$1</h1>");
+    // Bold / italic
+    working = working.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
+    // Links
+    working = working.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    // Blockquote
+    working = working.replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>");
+    // Lists
+    working = working.replace(/^\s*[\-\*] (.+)$/gm, "<li>$1</li>");
+    working = working.replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g, "<ul>$1</ul>");
+    working = working.replace(/^\s*\d+\. (.+)$/gm, "<li>$1</li>");
+    // Paragraphs / line breaks
+    working = working.split(/\n{2,}/).map((para) => {
+      if (/^<(h\d|ul|ol|pre|blockquote|li)/.test(para.trim())) return para;
+      return "<p>" + para.replace(/\n/g, "<br>") + "</p>";
+    }).join("\n");
+    return working;
+  }
+
+  // --- Chat rendering ---
+  function clearEmptyState() {
+    const e = chatInner.querySelector(".empty-state");
+    if (e) chatInner.innerHTML = "";
+  }
+
+  function makeBubble(role, content) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg " + role;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    if (role === "assistant") bubble.innerHTML = content ? renderMarkdown(content) : "";
+    else bubble.textContent = content;
+    wrap.appendChild(bubble);
+    return { wrap, bubble };
+  }
+
+  function addUsage(bubble, usage, modelId) {
+    if (!usage) return;
+    const row = document.createElement("div");
+    row.className = "usage-row";
+    if (usage.prompt_tokens != null) row.innerHTML += '<span class="tag">in ' + usage.prompt_tokens + '</span>';
+    if (usage.completion_tokens != null) row.innerHTML += '<span class="tag">out ' + usage.completion_tokens + '</span>';
+    if (usage.total_tokens != null) row.innerHTML += '<span class="tag">total ' + usage.total_tokens + '</span>';
+    const p = modelPrices[modelId] || {};
+    const pIn = parseFloat(p.prompt) || 0;
+    const pOut = parseFloat(p.completion) || 0;
+    const cost = ((usage.prompt_tokens || 0) * pIn + (usage.completion_tokens || 0) * pOut);
+    if (cost > 0) row.innerHTML += '<span class="tag">$' + cost.toFixed(6) + '</span>';
+    else if (pIn === 0 && pOut === 0) row.innerHTML += '<span class="tag">free</span>';
+    bubble.appendChild(row);
+  }
+
+  function scrollToBottom() {
+    const chat = $("chat");
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function makeCursor() {
+    const c = document.createElement("span");
+    c.className = "cursor";
+    return c;
+  }
+
+  // Build a turn: user message row + compare row with two empty assistant columns
+  function addTurn(userText, attachments) {
+    clearEmptyState();
+    const turn = document.createElement("div");
+    turn.className = "turn";
+
+    const userWrap = document.createElement("div");
+    userWrap.className = "user-msg";
+    const { wrap: userMsg, bubble: userBubble } = makeBubble("user", "");
+    renderUserBubble(userBubble, userText, attachments);
+    userWrap.appendChild(userMsg);
+    turn.appendChild(userWrap);
+
+    const compare = document.createElement("div");
+    compare.className = "compare-row";
+    const colA = makeColumn("A", modelSelectA.value.trim());
+    const colB = makeColumn("B", modelSelectB.value.trim());
+    compare.appendChild(colA.col);
+    compare.appendChild(colB.col);
+    turn.appendChild(compare);
+
+    chatInner.appendChild(turn);
+    scrollToBottom();
+    return { colA, colB };
+  }
+
+  function makeColumn(side, modelId) {
+    const col = document.createElement("div");
+    col.className = "col";
+    const header = document.createElement("div");
+    header.className = "col-header";
+    const dot = document.createElement("span");
+    dot.className = "dot " + side.toLowerCase();
+    const label = document.createElement("span");
+    label.className = "model-id";
+    label.textContent = modelId || "(none)";
+    const copy = document.createElement("button");
+    copy.className = "copy-btn";
+    copy.textContent = "copy";
+    copy.style.display = "none";
+    header.appendChild(dot);
+    header.appendChild(label);
+    header.appendChild(copy);
+    const { wrap, bubble } = makeBubble("assistant", "");
+    col.appendChild(header);
+    col.appendChild(wrap);
+    return { col, bubble, copy, label };
+  }
+
+  function setErrorBubble(bubble, text) {
+    bubble.className = "bubble error";
+    bubble.textContent = text;
+  }
+
+  // --- Build request body for one side ---
+  function buildBody(modelId, useStream, side) {
+    const messages = [];
+    const sys = systemPrompt.value.trim();
+    if (sys) messages.push({ role: "system", content: sys });
+    conversations[side].forEach((m) => messages.push({ role: m.role, content: m.content }));
+    const body = {
+      model: modelId,
+      messages: messages,
+      temperature: parseFloat(temperature.value),
+      top_p: parseFloat(topP.value),
+      stream: useStream
+    };
+    const mt = parseInt(maxTokens.value, 10);
+    if (mt > 0) body.max_tokens = mt;
+    return body;
+  }
+
+  function logDebug(obj) {
+    debugBody.textContent = JSON.stringify(obj, null, 2);
+  }
+
+  // Run one model: streams into the given bubble, returns full text + usage
+  async function runModel(side, modelId, bubble, copyBtn, useStream) {
+    const key = apikeyInput.value.trim();
+    const body = buildBody(modelId, useStream, side);
+    const headers = {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + key,
+      "HTTP-Referer": REFERER,
+      "X-Title": X_TITLE
+    };
+    if (useStream) headers["Accept"] = "text/event-stream";
+    const ac = new AbortController();
+    abortControllers[side] = ac;
+    let full = "";
+    let usage = null;
+    try {
+      const res = await fetch(OPENROUTER_CHAT, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: ac.signal
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        let msg = "HTTP " + res.status;
+        try { const j = JSON.parse(txt); msg += ": " + (j.error && j.error.message || txt); } catch { msg += ": " + txt; }
+        setErrorBubble(bubble, msg);
+        logDebug({ side, request: { url: OPENROUTER_CHAT, body }, response: { status: res.status, body: txt } });
+        conversations[side].pop();
+        return { full: "", usage: null, error: msg };
+      }
+      const cursor = makeCursor();
+      if (useStream && res.body) {
+        bubble.appendChild(cursor);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split(/\r?\n/);
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (!line.startsWith("data:")) continue;
+            const payload = line.slice(5).trim();
+            if (payload === "[DONE]") continue;
+            try {
+              const ev = JSON.parse(payload);
+              if (ev.usage) usage = ev.usage;
+              const choices = ev.choices || [];
+              for (const c of choices) {
+                const d = c.delta;
+                if (d && d.content) { full += d.content; }
+              }
+            } catch {}
+            bubble.innerHTML = renderMarkdown(full);
+            bubble.appendChild(cursor);
+            scrollToBottom();
+          }
+        }
+        if (cursor.parentNode) cursor.remove();
+      } else {
+        const json = await res.json();
+        usage = json.usage || null;
+        const choice = json.choices && json.choices[0];
+        full = (choice && choice.message && choice.message.content) || "";
+        bubble.innerHTML = renderMarkdown(full);
+        logDebug({ side, request: { url: OPENROUTER_CHAT, body }, response: json });
+      }
+      if (copyBtn) {
+        copyBtn.style.display = "";
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(full).then(() => { copyBtn.textContent = "copied"; setTimeout(() => copyBtn.textContent = "copy", 1200); });
+        };
+      }
+      addUsage(bubble, usage, modelId);
+      return { full, usage, error: null };
+    } catch (e) {
+      if (e.name === "AbortError") {
+        if (bubble.querySelector(".cursor")) bubble.querySelector(".cursor").remove();
+        return { full, usage, error: "aborted" };
+      }
+      setErrorBubble(bubble, e.message);
+      conversations[side].pop();
+      return { full: "", usage: null, error: e.message };
+    } finally {
+      abortControllers[side] = null;
+    }
+  }
+
+  function checkDone() {
+    activeCount--;
+    if (activeCount <= 0) {
+      activeCount = 0;
+      sendBtn.style.display = "inline-block";
+      stopBtn.style.display = "none";
+      setStatus("Done", "ok");
+    }
+  }
+
+  // --- Send (parallel) ---
+  function send() {
+    const key = apikeyInput.value.trim();
+    if (!key) { setStatus("Enter your API key first", "err"); apikeyInput.focus(); return; }
+    const modelA = modelSelectA.value.trim();
+    const modelB = modelSelectB.value.trim();
+    if (!modelA && !modelB) { setStatus("Select at least one model", "err"); modelSelectA.focus(); return; }
+    const text = promptEl.value.trim();
+    if (!text && pendingAttachments.length === 0) return;
+
+    const attachments = pendingAttachments.filter((a) => a.status === "ready" && !a.error);
+    const content = buildUserContent(text);
+    promptEl.value = "";
+    autoGrow();
+    pendingAttachments = [];
+    renderAttachments();
+
+    const useStream = streaming;
+    const { colA, colB } = addTurn(text, attachments);
+
+    if (modelA) conversations.A.push({ role: "user", content: content });
+    if (modelB) conversations.B.push({ role: "user", content: content });
+
+    sendBtn.style.display = "none";
+    stopBtn.style.display = "inline-block";
+    setStatus("Sending…", "");
+
+    const tasks = [];
+    if (modelA) {
+      activeCount++;
+      tasks.push(runModel("A", modelA, colA.bubble, colA.copy, useStream).then((r) => {
+        if (r.full && !r.error) conversations.A.push({ role: "assistant", content: r.full });
+        checkDone();
+      }));
+    }
+    if (modelB) {
+      activeCount++;
+      tasks.push(runModel("B", modelB, colB.bubble, colB.copy, useStream).then((r) => {
+        if (r.full && !r.error) conversations.B.push({ role: "assistant", content: r.full });
+        checkDone();
+      }));
+    }
+    if (tasks.length === 0) {
+      sendBtn.style.display = "inline-block";
+      stopBtn.style.display = "none";
+      setStatus("No models selected", "err");
+    }
+  }
+
+  stopBtn.addEventListener("click", () => {
+    if (abortControllers.A) abortControllers.A.abort();
+    if (abortControllers.B) abortControllers.B.abort();
+  });
+  sendBtn.addEventListener("click", send);
+  promptEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  function autoGrow() {
+    promptEl.style.height = "auto";
+    promptEl.style.height = Math.min(promptEl.scrollHeight, 180) + "px";
+  }
+  promptEl.addEventListener("input", autoGrow);
+})();
+</script>
+</body>
+</html>
