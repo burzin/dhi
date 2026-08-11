@@ -383,6 +383,62 @@
     border-radius: 6px; padding: 4px 10px; font-size: 12px; color: var(--muted);
   }
   .user-attachments .doc-ref .doc-icon { font-size: 16px; }
+
+  /* Mode toggle per model */
+  .model-field { display: flex; flex-direction: column; gap: 3px; }
+  .model-field label {
+    font-size: 10px; color: var(--muted); font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .model-row { display: flex; gap: 4px; align-items: center; }
+  .model-row input[type="text"] { width: 200px; font-family: var(--mono); font-size: 12px; }
+  .mode-toggle {
+    background: var(--panel-2); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 8px; cursor: pointer; font-size: 10px;
+    white-space: nowrap; text-transform: uppercase; letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+  .mode-toggle:hover { border-color: var(--accent); }
+  .mode-toggle.custom { color: var(--accent); border-color: var(--accent); background: rgba(79,140,255,0.12); }
+  .mode-toggle .or { color: var(--text); }
+  .mode-toggle.custom .or { color: var(--muted); }
+  .mode-toggle .cu { color: var(--muted); }
+  .mode-toggle.custom .cu { color: var(--accent); }
+  .mode-toggle .sep { opacity: 0.4; margin: 0 2px; }
+
+  /* Custom endpoint config panels */
+  .ep-panel {
+    display: none;
+    padding: 10px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    gap: 16px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .ep-panel.open { display: flex; }
+  .ep-panel .ep-group { display: flex; flex-direction: column; gap: 3px; }
+  .ep-panel .ep-group label {
+    font-size: 10px; color: var(--muted); font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .ep-panel .ep-title {
+    font-size: 12px; font-weight: 600; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-right: 8px; padding-bottom: 6px;
+  }
+  .ep-panel input { font-family: var(--mono); font-size: 12px; }
+  .ep-panel .ep-url { width: 340px; }
+  .ep-panel .ep-token { width: 200px; }
+  .ep-panel .ep-model { width: 220px; }
+  .ep-fetch-btn {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 12px; cursor: pointer; font-size: 12px; white-space: nowrap;
+  }
+  .ep-fetch-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ep-fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -392,21 +448,63 @@
     <label for="apikey">API Key</label>
     <input id="apikey" type="password" placeholder="sk-or-v1-..." spellcheck="false" autocomplete="off" />
   </div>
-  <div class="hdr-field">
-    <label for="modelSelectA">Model A</label>
-    <input id="modelSelectA" list="modelList" placeholder="openai/gpt-4o-mini" spellcheck="false" autocomplete="off" />
+  <div class="model-field">
+    <label>Model A</label>
+    <div class="model-row">
+      <input id="modelSelectA" list="modelList" placeholder="openai/gpt-4o-mini" spellcheck="false" autocomplete="off" />
+      <button class="mode-toggle" id="modeToggleA" title="Toggle OpenRouter / Custom endpoint"><span class="or">OR</span><span class="sep">/</span><span class="cu">Custom</span></button>
+    </div>
   </div>
-  <div class="hdr-field">
-    <label for="modelSelectB">Model B</label>
-    <input id="modelSelectB" list="modelList" placeholder="anthropic/claude-3.5-sonnet" spellcheck="false" autocomplete="off" />
+  <div class="model-field">
+    <label>Model B</label>
+    <div class="model-row">
+      <input id="modelSelectB" list="modelList" placeholder="anthropic/claude-3.5-sonnet" spellcheck="false" autocomplete="off" />
+      <button class="mode-toggle" id="modeToggleB" title="Toggle OpenRouter / Custom endpoint"><span class="or">OR</span><span class="sep">/</span><span class="cu">Custom</span></button>
+    </div>
   </div>
   <datalist id="modelList"></datalist>
+  <datalist id="modelListA"></datalist>
+  <datalist id="modelListB"></datalist>
   <button id="loadModelsBtn">Load Models</button>
   <button id="settingsBtn">Settings</button>
   <button id="clearBtn">Clear Chat</button>
   <div class="spacer"></div>
   <span class="status-pill" id="status">Ready</span>
 </header>
+
+<div class="ep-panel" id="epPanelA">
+  <span class="ep-title">Model A — Custom Endpoint</span>
+  <div class="ep-group">
+    <label for="epUrlA">Endpoint URL</label>
+    <input id="epUrlA" class="ep-url" type="text" placeholder="https://api.example.com/v1/chat/completions" spellcheck="false" autocomplete="off" />
+  </div>
+  <div class="ep-group">
+    <label for="epTokenA">Bearer Token</label>
+    <input id="epTokenA" class="ep-token" type="password" placeholder="sk-..." spellcheck="false" autocomplete="off" />
+  </div>
+  <div class="ep-group">
+    <label for="epModelA">Model Name</label>
+    <input id="epModelA" class="ep-model" list="modelListA" placeholder="gpt-4o" spellcheck="false" autocomplete="off" />
+  </div>
+  <button class="ep-fetch-btn" id="epFetchA">Fetch Models</button>
+</div>
+
+<div class="ep-panel" id="epPanelB">
+  <span class="ep-title">Model B — Custom Endpoint</span>
+  <div class="ep-group">
+    <label for="epUrlB">Endpoint URL</label>
+    <input id="epUrlB" class="ep-url" type="text" placeholder="https://api.example.com/v1/chat/completions" spellcheck="false" autocomplete="off" />
+  </div>
+  <div class="ep-group">
+    <label for="epTokenB">Bearer Token</label>
+    <input id="epTokenB" class="ep-token" type="password" placeholder="sk-..." spellcheck="false" autocomplete="off" />
+  </div>
+  <div class="ep-group">
+    <label for="epModelB">Model Name</label>
+    <input id="epModelB" class="ep-model" list="modelListB" placeholder="gpt-4o" spellcheck="false" autocomplete="off" />
+  </div>
+  <button class="ep-fetch-btn" id="epFetchB">Fetch Models</button>
+</div>
 
 <div id="settingsPanel">
   <div class="setting">
@@ -480,6 +578,25 @@
   const debugHeader = $("debugHeader");
   const debugBody = $("debugBody");
   const debugChev = $("debugChev");
+
+  // Per-side mode and custom endpoint inputs
+  const modeToggleA = $("modeToggleA");
+  const modeToggleB = $("modeToggleB");
+  const epPanelA = $("epPanelA");
+  const epPanelB = $("epPanelB");
+  const epUrlA = $("epUrlA");
+  const epUrlB = $("epUrlB");
+  const epTokenA = $("epTokenA");
+  const epTokenB = $("epTokenB");
+  const epModelA = $("epModelA");
+  const epModelB = $("epModelB");
+  const epFetchA = $("epFetchA");
+  const epFetchB = $("epFetchB");
+  const modelListA = $("modelListA");
+  const modelListB = $("modelListB");
+
+  // modes: "or" (openrouter) or "custom"
+  let modes = { A: "or", B: "or" };
 
   const OPENROUTER_CHAT = "https://openrouter.ai/api/v1/chat/completions";
   const OPENROUTER_MODELS = "https://openrouter.ai/api/v1/models";
@@ -758,6 +875,67 @@
     }
   });
 
+  // --- Mode toggles (OR <-> Custom) ---
+  function setMode(side, mode) {
+    modes[side] = mode;
+    const toggle = side === "A" ? modeToggleA : modeToggleB;
+    const panel = side === "A" ? epPanelA : epPanelB;
+    if (mode === "custom") { toggle.classList.add("custom"); panel.classList.add("open"); }
+    else { toggle.classList.remove("custom"); panel.classList.remove("open"); }
+  }
+  modeToggleA.addEventListener("click", () => setMode("A", modes.A === "or" ? "custom" : "or"));
+  modeToggleB.addEventListener("click", () => setMode("B", modes.B === "or" ? "custom" : "or"));
+
+  // --- Fetch models from a custom endpoint ---
+  // Derive /models URL from a chat completions URL by replacing the last path segment.
+  function deriveModelsUrl(chatUrl) {
+    try {
+      const u = new URL(chatUrl);
+      const parts = u.pathname.split("/").filter(Boolean);
+      if (parts.length) parts[parts.length - 1] = "models";
+      u.pathname = "/" + parts.join("/");
+      return u.toString();
+    } catch { return chatUrl.replace(/\/chat\/completions\/?$/, "/models").replace(/\/completions\/?$/, "/models"); }
+  }
+
+  async function fetchCustomModels(side) {
+    const url = (side === "A" ? epUrlA : epUrlB).value.trim();
+    const token = (side === "A" ? epTokenA : epTokenB).value.trim();
+    const btn = side === "A" ? epFetchA : epFetchB;
+    const dl = side === "A" ? modelListA : modelListB;
+    if (!url) { setStatus("Model " + side + ": enter endpoint URL first", "err"); (side === "A" ? epUrlA : epUrlB).focus(); return; }
+    btn.disabled = true;
+    setStatus("Model " + side + ": fetching models…", "");
+    const modelsUrl = deriveModelsUrl(url);
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = "Bearer " + token;
+      const res = await fetch(modelsUrl, { method: "GET", headers });
+      if (!res.ok) { setStatus("Model " + side + ": fetch failed (HTTP " + res.status + ")", "err"); return; }
+      const json = await res.json();
+      const data = json.data || json.models || (Array.isArray(json) ? json : []);
+      dl.innerHTML = "";
+      let count = 0;
+      data.forEach((m) => {
+        const id = typeof m === "string" ? m : (m.id || m.name);
+        if (!id) return;
+        const opt = document.createElement("option");
+        opt.value = id;
+        dl.appendChild(opt);
+        count++;
+      });
+      const modelInput = side === "A" ? epModelA : epModelB;
+      if (!modelInput.value && count) modelInput.value = data[0].id || data[0].name || data[0];
+      setStatus("Model " + side + ": loaded " + count + " models", "ok");
+    } catch (e) {
+      setStatus("Model " + side + ": " + e.message + " (you can still type the model name manually)", "err");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  epFetchA.addEventListener("click", () => fetchCustomModels("A"));
+  epFetchB.addEventListener("click", () => fetchCustomModels("B"));
+
   // --- Minimal markdown renderer ---
   function escapeHtml(s) {
     const e = "&";
@@ -865,10 +1043,13 @@
 
     const compare = document.createElement("div");
     compare.className = "compare-row";
-    const colA = makeColumn("A", modelSelectA.value.trim());
-    const colB = makeColumn("B", modelSelectB.value.trim());
+    const cfgA = resolveSide("A");
+    const cfgB = resolveSide("B");
+    const colA = makeColumn("A", cfgA.modelId);
+    const colB = makeColumn("B", cfgB.modelId);
     compare.appendChild(colA.col);
-    compare.appendChild(colB.col);
+    if (cfgB.modelId || modes.B === "custom") compare.appendChild(colB.col);
+    else { colA.col.style.gridColumn = "1 / -1"; }
     turn.appendChild(compare);
 
     chatInner.appendChild(turn);
@@ -922,29 +1103,46 @@
     return body;
   }
 
+  // Resolve per-side config: returns { url, key, headers, modelId }
+  function resolveSide(side) {
+    if (modes[side] === "custom") {
+      const url = (side === "A" ? epUrlA : epUrlB).value.trim();
+      const token = (side === "A" ? epTokenA : epTokenB).value.trim();
+      const modelId = (side === "A" ? epModelA : epModelB).value.trim();
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = "Bearer " + token;
+      return { url, key: token, headers, modelId };
+    }
+    const modelId = (side === "A" ? modelSelectA : modelSelectB).value.trim();
+    const headers = {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + apikeyInput.value.trim(),
+      "HTTP-Referer": REFERER,
+      "X-Title": X_TITLE
+    };
+    return { url: OPENROUTER_CHAT, key: apikeyInput.value.trim(), headers, modelId };
+  }
+
   function logDebug(obj) {
     debugBody.textContent = JSON.stringify(obj, null, 2);
   }
 
   // Run one model: streams into the given bubble, returns full text + usage
-  async function runModel(side, modelId, bubble, copyBtn, useStream) {
-    const key = apikeyInput.value.trim();
+  async function runModel(side, cfg, bubble, copyBtn, useStream) {
+    const { url, headers, modelId } = cfg;
+    if (!url) { setErrorBubble(bubble, "No endpoint URL set for Model " + side); conversations[side].pop(); return { full: "", usage: null, error: "no url" }; }
+    if (!modelId) { setErrorBubble(bubble, "No model name set for Model " + side); conversations[side].pop(); return { full: "", usage: null, error: "no model" }; }
     const body = buildBody(modelId, useStream, side);
-    const headers = {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + key,
-      "HTTP-Referer": REFERER,
-      "X-Title": X_TITLE
-    };
-    if (useStream) headers["Accept"] = "text/event-stream";
+    const reqHeaders = { ...headers };
+    if (useStream) reqHeaders["Accept"] = "text/event-stream";
     const ac = new AbortController();
     abortControllers[side] = ac;
     let full = "";
     let usage = null;
     try {
-      const res = await fetch(OPENROUTER_CHAT, {
+      const res = await fetch(url, {
         method: "POST",
-        headers,
+        headers: reqHeaders,
         body: JSON.stringify(body),
         signal: ac.signal
       });
@@ -953,7 +1151,7 @@
         let msg = "HTTP " + res.status;
         try { const j = JSON.parse(txt); msg += ": " + (j.error && j.error.message || txt); } catch { msg += ": " + txt; }
         setErrorBubble(bubble, msg);
-        logDebug({ side, request: { url: OPENROUTER_CHAT, body }, response: { status: res.status, body: txt } });
+        logDebug({ side, request: { url, body }, response: { status: res.status, body: txt } });
         conversations[side].pop();
         return { full: "", usage: null, error: msg };
       }
@@ -994,7 +1192,7 @@
         const choice = json.choices && json.choices[0];
         full = (choice && choice.message && choice.message.content) || "";
         bubble.innerHTML = renderMarkdown(full);
-        logDebug({ side, request: { url: OPENROUTER_CHAT, body }, response: json });
+        logDebug({ side, request: { url, body }, response: json });
       }
       if (copyBtn) {
         copyBtn.style.display = "";
@@ -1029,11 +1227,17 @@
 
   // --- Send (parallel) ---
   function send() {
-    const key = apikeyInput.value.trim();
-    if (!key) { setStatus("Enter your API key first", "err"); apikeyInput.focus(); return; }
-    const modelA = modelSelectA.value.trim();
-    const modelB = modelSelectB.value.trim();
-    if (!modelA && !modelB) { setStatus("Select at least one model", "err"); modelSelectA.focus(); return; }
+    const cfgA = resolveSide("A");
+    const cfgB = resolveSide("B");
+    // Validate: at least one side must have both URL and model
+    const aOk = cfgA.url && cfgA.modelId;
+    const bOk = cfgB.url && cfgB.modelId;
+    if (!aOk && !bOk) {
+      // Provide a helpful message
+      if (modes.A === "or" && modes.B === "or" && !apikeyInput.value.trim()) { setStatus("Enter your OpenRouter API key first", "err"); apikeyInput.focus(); return; }
+      setStatus("Configure at least one model (endpoint + model name)", "err");
+      return;
+    }
     const text = promptEl.value.trim();
     if (!text && pendingAttachments.length === 0) return;
 
@@ -1047,24 +1251,24 @@
     const useStream = streaming;
     const { colA, colB } = addTurn(text, attachments);
 
-    if (modelA) conversations.A.push({ role: "user", content: content });
-    if (modelB) conversations.B.push({ role: "user", content: content });
+    if (aOk) conversations.A.push({ role: "user", content: content });
+    if (bOk) conversations.B.push({ role: "user", content: content });
 
     sendBtn.style.display = "none";
     stopBtn.style.display = "inline-block";
     setStatus("Sending…", "");
 
     const tasks = [];
-    if (modelA) {
+    if (aOk) {
       activeCount++;
-      tasks.push(runModel("A", modelA, colA.bubble, colA.copy, useStream).then((r) => {
+      tasks.push(runModel("A", cfgA, colA.bubble, colA.copy, useStream).then((r) => {
         if (r.full && !r.error) conversations.A.push({ role: "assistant", content: r.full });
         checkDone();
       }));
     }
-    if (modelB) {
+    if (bOk) {
       activeCount++;
-      tasks.push(runModel("B", modelB, colB.bubble, colB.copy, useStream).then((r) => {
+      tasks.push(runModel("B", cfgB, colB.bubble, colB.copy, useStream).then((r) => {
         if (r.full && !r.error) conversations.B.push({ role: "assistant", content: r.full });
         checkDone();
       }));
