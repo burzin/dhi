@@ -29,16 +29,33 @@ Runs entirely client-side — no backend, no build step. Just open `index.html` 
 
 ### Run
 
-Because the tool makes cross-origin requests to OpenRouter from the browser, you need to serve it over HTTP (not `file://`):
+Because the tool makes cross-origin requests to OpenRouter and custom endpoints from the browser, you need to serve it via the included proxy server:
 
 ```bash
 cd dhi
-python3 -m http.server 8765
+python3 server.py
 ```
+
+This starts a local server on port 8765 that:
+- Serves `index.html` at http://localhost:8765/
+- Provides a `/proxy?url=<target>` endpoint that forwards requests to any external API, bypassing CORS restrictions (needed for endpoints behind Cloudflare or without CORS headers)
 
 Then open http://localhost:8765/index.html in your browser.
 
 > Opening the file directly via `file://` will not work — browsers block cross-origin `fetch` from the `null` origin.
+
+### Using Custom Endpoints
+
+Each model (A and B) can be toggled between **OpenRouter** mode and **Custom** mode via the `OR / Custom` button next to each model selector.
+
+In Custom mode, a config panel expands with three fields:
+- **Endpoint URL** — full chat completions URL (e.g. `https://api.example.com/v1/chat/completions`)
+- **Bearer Token** — sent as `Authorization: Bearer <token>`
+- **Model Name** — the model ID for that endpoint
+
+Custom endpoint requests are automatically routed through the local proxy (`/proxy?url=...`) to bypass CORS. The proxy uses `curl` under the hood, so it handles Cloudflare TLS fingerprinting correctly.
+
+Click **Fetch Models** to try loading the endpoint's model list (derives `/models` from the chat completions URL). Falls back to manual typing if the endpoint doesn't support it.
 
 ### Usage
 
@@ -78,6 +95,7 @@ Attachments are sent to both models for comparison. They are cleared after each 
 ## Tech Stack
 
 - Single HTML file (vanilla JS, no framework, no build step)
+- `server.py` — local proxy server (Python stdlib + curl) for serving static files and bypassing CORS
 - CSS custom properties for theming
 - [pdf.js](https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/) loaded lazily from CDN for PDF text extraction
 
@@ -105,6 +123,7 @@ The tool sends these headers with each chat completion request:
 ```
 dhi/
 ├── index.html   # The entire application (HTML + CSS + JS)
+├── server.py    # Local proxy server (static files + CORS bypass via curl)
 └── README.md    # This file
 ```
 

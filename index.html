@@ -476,7 +476,7 @@
   <span class="ep-title">Model A — Custom Endpoint</span>
   <div class="ep-group">
     <label for="epUrlA">Endpoint URL</label>
-    <input id="epUrlA" class="ep-url" type="text" placeholder="https://api.example.com/v1/chat/completions" spellcheck="false" autocomplete="off" />
+    <input id="epUrlA" class="ep-url" type="text" placeholder="https://api.example.com/v1/chat/completions (routed via local proxy)" spellcheck="false" autocomplete="off" />
   </div>
   <div class="ep-group">
     <label for="epTokenA">Bearer Token</label>
@@ -493,7 +493,7 @@
   <span class="ep-title">Model B — Custom Endpoint</span>
   <div class="ep-group">
     <label for="epUrlB">Endpoint URL</label>
-    <input id="epUrlB" class="ep-url" type="text" placeholder="https://api.example.com/v1/chat/completions" spellcheck="false" autocomplete="off" />
+    <input id="epUrlB" class="ep-url" type="text" placeholder="https://api.example.com/v1/chat/completions (routed via local proxy)" spellcheck="false" autocomplete="off" />
   </div>
   <div class="ep-group">
     <label for="epTokenB">Bearer Token</label>
@@ -910,7 +910,7 @@
     try {
       const headers = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = "Bearer " + token;
-      const res = await fetch(modelsUrl, { method: "GET", headers });
+      const res = await fetch(proxyUrl(modelsUrl), { method: "GET", headers });
       if (!res.ok) { setStatus("Model " + side + ": fetch failed (HTTP " + res.status + ")", "err"); return; }
       const json = await res.json();
       const data = json.data || json.models || (Array.isArray(json) ? json : []);
@@ -1103,7 +1103,15 @@
     return body;
   }
 
-  // Resolve per-side config: returns { url, key, headers, modelId }
+  const PROXY = "/proxy?url=";
+
+  // Route a URL through the local proxy to bypass CORS (for custom endpoints).
+  function proxyUrl(url) {
+    if (!url) return url;
+    return PROXY + encodeURIComponent(url);
+  }
+
+  // Resolve per-side config: returns { url, fetchUrl, key, headers, modelId }
   function resolveSide(side) {
     if (modes[side] === "custom") {
       const url = (side === "A" ? epUrlA : epUrlB).value.trim();
@@ -1111,7 +1119,7 @@
       const modelId = (side === "A" ? epModelA : epModelB).value.trim();
       const headers = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = "Bearer " + token;
-      return { url, key: token, headers, modelId };
+      return { url, fetchUrl: proxyUrl(url), key: token, headers, modelId };
     }
     const modelId = (side === "A" ? modelSelectA : modelSelectB).value.trim();
     const headers = {
@@ -1120,7 +1128,7 @@
       "HTTP-Referer": REFERER,
       "X-Title": X_TITLE
     };
-    return { url: OPENROUTER_CHAT, key: apikeyInput.value.trim(), headers, modelId };
+    return { url: OPENROUTER_CHAT, fetchUrl: OPENROUTER_CHAT, key: apikeyInput.value.trim(), headers, modelId };
   }
 
   function logDebug(obj) {
@@ -1129,7 +1137,7 @@
 
   // Run one model: streams into the given bubble, returns full text + usage
   async function runModel(side, cfg, bubble, copyBtn, useStream) {
-    const { url, headers, modelId } = cfg;
+    const { url, fetchUrl, headers, modelId } = cfg;
     if (!url) { setErrorBubble(bubble, "No endpoint URL set for Model " + side); conversations[side].pop(); return { full: "", usage: null, error: "no url" }; }
     if (!modelId) { setErrorBubble(bubble, "No model name set for Model " + side); conversations[side].pop(); return { full: "", usage: null, error: "no model" }; }
     const body = buildBody(modelId, useStream, side);
@@ -1140,7 +1148,7 @@
     let full = "";
     let usage = null;
     try {
-      const res = await fetch(url, {
+      const res = await fetch(fetchUrl, {
         method: "POST",
         headers: reqHeaders,
         body: JSON.stringify(body),
